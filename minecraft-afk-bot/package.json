@@ -1,5 +1,5 @@
 {
-  "name": "minecraft-afk-bot",
+  "name": "@workspace/minecraft-afk-bot",
   "version": "1.0.0",
   "private": true,
   "description": "A small Mineflayer bot with an Express status and control API.",
