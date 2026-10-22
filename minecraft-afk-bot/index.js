@@ -22,10 +22,6 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error("PORT must be an integer between 1 and 65535.");
 }
 
-if (!isLoopback(host) && !controlToken) {
-  throw new Error("Set CONTROL_TOKEN before binding the control API to a non-local address.");
-}
-
 let bot = null;
 let state = "idle";
 let lastError = null;
@@ -39,6 +35,7 @@ let jumpPulseTimer = null;
 
 function isAuthorized(req) {
   if (isLoopback(host)) return true;
+  if (!controlToken) return false;
 
   const authorization = req.get("authorization") || "";
   const supplied = authorization.startsWith("Bearer ")
@@ -200,7 +197,11 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
 
-app.get("/api/status", (_req, res) => {
+app.get("/", (_req, res) => {
+  res.status(200).send("OK");
+});
+
+app.get("/api/status", requireControlAuthorization, (_req, res) => {
   res.json(publicStatus());
 });
 
@@ -277,4 +278,9 @@ app.use((error, _req, res, _next) => {
 
 app.listen(port, host, () => {
   process.stdout.write(`Minecraft bot control API listening on ${host}:${port}\n`);
+  if (process.env.MC_AUTO_START === "true" && process.env.MC_USERNAME) {
+    reconnectEnabled = true;
+    reconnectAttempt = 0;
+    connectBot();
+  }
 });

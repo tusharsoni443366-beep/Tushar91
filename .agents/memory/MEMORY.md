@@ -1,1 +1,2 @@
 - [Minecraft bot authorization](minecraft-bot-authorization.md) — the user confirmed permission for timed jumps and auto-reconnect on the configured server.
+- [Uptime endpoint security](uptime-endpoint-security.md) — keep the public health response minimal and protect bot control/status routes.
