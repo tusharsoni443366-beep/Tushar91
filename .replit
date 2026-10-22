@@ -44,3 +44,11 @@ timeoutMs = 20000
 [userenv.shared]
 MC_USERNAME = "Tushar91"
 MC_AUTH = "offline"
+
+[[ports]]
+localPort = 8080
+externalPort = 80
+
+[[ports]]
+localPort = 8081
+externalPort = 8081
