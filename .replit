@@ -43,3 +43,4 @@ timeoutMs = 20000
 
 [userenv.shared]
 MC_USERNAME = "Tushar91"
+MC_AUTH = "offline"
