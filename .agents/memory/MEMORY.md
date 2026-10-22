@@ -1,0 +1,1 @@
+- [Minecraft bot authorization](minecraft-bot-authorization.md) — the user confirmed permission for timed jumps and auto-reconnect on the configured server.

@@ -11,6 +11,8 @@ app.use(express.json({ limit: "8kb" }));
 const host = process.env.HOST || "127.0.0.1";
 const port = Number(process.env.PORT || 3000);
 const controlToken = process.env.CONTROL_TOKEN || "";
+const serverHost = process.env.MC_HOST || "ICE_MC_fun.aternos.me";
+const serverPort = Number(process.env.MC_PORT || 13174);
 
 function isLoopback(address) {
   return address === "127.0.0.1" || address === "::1" || address === "localhost";
@@ -28,6 +30,12 @@ let bot = null;
 let state = "idle";
 let lastError = null;
 let connectedAt = null;
+let reconnectEnabled = false;
+let reconnectTimer = null;
+let reconnectAttempt = 0;
+let stableConnectionTimer = null;
+let jumpInterval = null;
+let jumpPulseTimer = null;
 
 function isAuthorized(req) {
   if (isLoopback(host)) return true;
@@ -59,6 +67,135 @@ function publicStatus() {
   };
 }
 
+function clearJumpTimers(targetBot = bot) {
+  if (jumpInterval) {
+    clearInterval(jumpInterval);
+    jumpInterval = null;
+  }
+  if (jumpPulseTimer) {
+    clearTimeout(jumpPulseTimer);
+    jumpPulseTimer = null;
+  }
+  if (targetBot) {
+    try {
+      targetBot.setControlState("jump", false);
+    } catch {
+      // The connection may already be closed.
+    }
+  }
+}
+
+function startJumpLoop(targetBot) {
+  clearJumpTimers(targetBot);
+  jumpInterval = setInterval(() => {
+    if (bot !== targetBot || state !== "online") return;
+
+    try {
+      targetBot.setControlState("jump", true);
+      jumpPulseTimer = setTimeout(() => {
+        jumpPulseTimer = null;
+        if (bot !== targetBot) return;
+        try {
+          targetBot.setControlState("jump", false);
+        } catch (error) {
+          lastError = error instanceof Error ? error.message : String(error);
+        }
+      }, 500);
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+    }
+  }, 30_000);
+}
+
+function scheduleReconnect() {
+  if (!reconnectEnabled || reconnectTimer) return;
+
+  const delay = Math.min(60_000, 5_000 * 2 ** reconnectAttempt);
+  reconnectAttempt += 1;
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    if (reconnectEnabled) connectBot();
+  }, delay);
+  reconnectTimer.unref?.();
+}
+
+function clearStableConnectionTimer() {
+  if (stableConnectionTimer) {
+    clearTimeout(stableConnectionTimer);
+    stableConnectionTimer = null;
+  }
+}
+
+function connectBot() {
+  if (!reconnectEnabled || bot) return false;
+
+  state = "connecting";
+  connectedAt = null;
+
+  try {
+    const auth = process.env.MC_AUTH || "offline";
+    bot = mineflayer.createBot({
+      host: serverHost,
+      port: serverPort,
+      username: process.env.MC_USERNAME,
+      auth,
+      ...(process.env.MC_VERSION ? { version: process.env.MC_VERSION } : {}),
+    });
+
+    const currentBot = bot;
+
+    currentBot.once("login", () => {
+      if (bot !== currentBot) return;
+      state = "online";
+      connectedAt = new Date().toISOString();
+      lastError = null;
+      clearStableConnectionTimer();
+      stableConnectionTimer = setTimeout(() => {
+        reconnectAttempt = 0;
+        stableConnectionTimer = null;
+      }, 120_000);
+      stableConnectionTimer.unref?.();
+    });
+
+    currentBot.on("spawn", () => {
+      if (bot === currentBot) startJumpLoop(currentBot);
+    });
+
+    currentBot.on("error", (error) => {
+      lastError = error.message;
+      if (state !== "stopping") state = "error";
+    });
+
+    currentBot.once("kicked", (reason) => {
+      lastError = typeof reason === "string" ? reason : String(reason);
+    });
+
+    currentBot.once("end", (reason) => {
+      clearJumpTimers(currentBot);
+      clearStableConnectionTimer();
+      if (bot === currentBot) bot = null;
+      connectedAt = null;
+
+      if (reason && !lastError) lastError = String(reason);
+      if (state === "stopping" || !reconnectEnabled) {
+        state = "idle";
+        return;
+      }
+
+      state = "disconnected";
+      scheduleReconnect();
+    });
+
+    return true;
+  } catch (error) {
+    bot = null;
+    state = "error";
+    lastError = error instanceof Error ? error.message : String(error);
+    scheduleReconnect();
+    return false;
+  }
+}
+
 app.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
@@ -68,20 +205,18 @@ app.get("/api/status", (_req, res) => {
 });
 
 app.post("/api/start", requireControlAuthorization, (_req, res) => {
-  if (bot) {
-    return res.status(409).json({ error: "The bot is already connecting or connected." });
+  if (bot || reconnectTimer) {
+    return res.status(409).json({ error: "The bot is already active or scheduled to reconnect." });
   }
 
-  const serverHost = process.env.MC_HOST;
   const username = process.env.MC_USERNAME;
 
-  if (!serverHost || !username) {
+  if (!username) {
     return res.status(400).json({
-      error: "Set MC_HOST and MC_USERNAME before starting the bot.",
+      error: "Set MC_USERNAME before starting the bot.",
     });
   }
 
-  const serverPort = Number(process.env.MC_PORT || 25565);
   if (!Number.isInteger(serverPort) || serverPort < 1 || serverPort > 65535) {
     return res.status(400).json({ error: "MC_PORT must be between 1 and 65535." });
   }
@@ -91,43 +226,13 @@ app.post("/api/start", requireControlAuthorization, (_req, res) => {
     return res.status(400).json({ error: "MC_AUTH must be offline or microsoft." });
   }
 
-  state = "connecting";
+  reconnectEnabled = true;
+  reconnectAttempt = 0;
   lastError = null;
   connectedAt = null;
 
-  try {
-    bot = mineflayer.createBot({
-      host: serverHost,
-      port: serverPort,
-      username,
-      auth,
-      ...(process.env.MC_VERSION ? { version: process.env.MC_VERSION } : {}),
-    });
-
-    bot.once("login", () => {
-      state = "online";
-      connectedAt = new Date().toISOString();
-    });
-
-    bot.on("error", (error) => {
-      lastError = error.message;
-      if (state !== "stopping") state = "error";
-    });
-
-    bot.once("kicked", (reason) => {
-      lastError = typeof reason === "string" ? reason : JSON.stringify(reason);
-    });
-
-    bot.once("end", (reason) => {
-      if (reason && !lastError) lastError = String(reason);
-      bot = null;
-      connectedAt = null;
-      if (state !== "stopping") state = "disconnected";
-    });
-  } catch (error) {
-    bot = null;
-    state = "error";
-    lastError = error instanceof Error ? error.message : String(error);
+  const started = connectBot();
+  if (!started) {
     return res.status(500).json({ error: "Could not start the bot.", ...publicStatus() });
   }
 
@@ -135,17 +240,28 @@ app.post("/api/start", requireControlAuthorization, (_req, res) => {
 });
 
 app.post("/api/stop", requireControlAuthorization, (_req, res) => {
+  reconnectEnabled = false;
+  reconnectAttempt = 0;
+  clearStableConnectionTimer();
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+
   if (!bot) {
+    clearJumpTimers();
     state = "idle";
     return res.json(publicStatus());
   }
 
   state = "stopping";
+  const currentBot = bot;
+  clearJumpTimers(currentBot);
   try {
-    bot.quit("Bot stopped by operator");
+    currentBot.quit("Bot stopped by operator");
   } catch (error) {
     lastError = error instanceof Error ? error.message : String(error);
-    bot = null;
+    if (bot === currentBot) bot = null;
     state = "error";
   }
 
