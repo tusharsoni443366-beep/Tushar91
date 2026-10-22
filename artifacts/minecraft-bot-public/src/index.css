@@ -1,0 +1,81 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap');
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --font-sans: var(--app-font-sans);
+  --font-mono: var(--app-font-mono);
+  --radius-md: var(--radius);
+}
+
+:root {
+  --background: 42 35% 95%;
+  --foreground: 164 20% 16%;
+  --border: 39 18% 84%;
+  --input: 39 18% 84%;
+  --ring: 86 46% 42%;
+  --card: 43 32% 98%;
+  --card-foreground: 164 20% 16%;
+  --primary: 85 45% 37%;
+  --primary-foreground: 48 45% 97%;
+  --muted: 43 22% 91%;
+  --muted-foreground: 158 9% 44%;
+  --app-font-sans: 'Manrope', sans-serif;
+  --app-font-mono: 'DM Mono', monospace;
+  --radius: 0.75rem;
+  --shadow-sm: 0 4px 18px rgba(39, 53, 42, 0.045);
+}
+
+.dark {
+  --background: 164 20% 10%;
+  --foreground: 42 28% 92%;
+  --border: 164 12% 24%;
+  --input: 164 12% 24%;
+  --ring: 85 45% 48%;
+  --card: 164 18% 13%;
+  --card-foreground: 42 28% 92%;
+  --primary: 85 45% 48%;
+  --primary-foreground: 164 20% 10%;
+  --muted: 164 14% 18%;
+  --muted-foreground: 155 9% 65%;
+}
+
+@layer base {
+  * { @apply border-border; }
+  html { min-width: 320px; }
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    margin: 0;
+  }
+  button { font: inherit; }
+}
+
+.dashboard-shell {
+  min-height: 100dvh;
+  background-color: hsl(var(--background));
+  background-image: radial-gradient(ellipse at 88% 5%, rgba(174, 191, 137, 0.13), transparent 32rem);
+}
+
+.status-pulse { animation: status-pulse 2.2s ease-in-out infinite; }
+@keyframes status-pulse { 50% { opacity: 0.42; } }
+
+.enter { animation: enter 500ms cubic-bezier(.2,.7,.25,1) both; }
+@keyframes enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+}

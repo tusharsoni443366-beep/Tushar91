@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Minecraft Bot"
+description = "A public Minecraft bot web service that serves a minimal GET / health response and runs the Mineflayer bot on port 3000."
+version = "1.0.0"
+id = "artifacts/minecraft-bot-public"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23307
+
+[services.development]
+run = "pnpm --filter @workspace/minecraft-bot-public run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/minecraft-bot-public", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/minecraft-bot-public/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23307"
+BASE_PATH = "/"
