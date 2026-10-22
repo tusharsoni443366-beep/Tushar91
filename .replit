@@ -25,12 +25,11 @@ name = "Minecraft AFK Bot"
 author = "agent"
 
 [workflows.workflow.metadata]
-outputType = "webview"
+outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "HOST=0.0.0.0 PORT=3000 MC_AUTO_START=true pnpm --filter @workspace/minecraft-afk-bot run start"
-waitForPort = 3000
+args = "PORT=3000 MC_AUTO_START=true pnpm --filter @workspace/minecraft-afk-bot run start"
 
 [agent]
 stack = "PNPM_WORKSPACE"
