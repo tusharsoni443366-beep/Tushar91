@@ -1,28 +1,26 @@
 kind = "web"
 previewPath = "/"
 title = "Minecraft Bot"
-description = "A public Minecraft bot web service that serves a minimal GET / health response and runs the Mineflayer bot on port 3000."
+description = "A public Minecraft AFK bot service with a minimal GET / health response."
 version = "1.0.0"
 id = "artifacts/minecraft-bot-public"
 router = "path"
 
 [[services]]
-name = "web"
-paths = [ "/" ]
-localPort = 23307
+name = "Minecraft AFK Bot"
+paths = ["/"]
+localPort = 3000
 
 [services.development]
-run = "pnpm --filter @workspace/minecraft-bot-public run dev"
+run = "HOST=0.0.0.0 PORT=3000 MC_AUTO_START=true pnpm --filter @workspace/minecraft-afk-bot run start"
 
-[services.production]
-build = [ "pnpm", "--filter", "@workspace/minecraft-bot-public", "run", "build" ]
-serve = "static"
-publicDir = "artifacts/minecraft-bot-public/dist/public"
+[services.production.run]
+args = ["pnpm", "--filter", "@workspace/minecraft-afk-bot", "run", "start"]
 
-[[services.production.rewrites]]
-from = "/*"
-to = "/index.html"
+[services.production.run.env]
+HOST = "0.0.0.0"
+PORT = "3000"
+MC_AUTO_START = "true"
 
-[services.env]
-PORT = "23307"
-BASE_PATH = "/"
+[services.production.health.startup]
+path = "/"
